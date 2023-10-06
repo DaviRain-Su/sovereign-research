@@ -65,7 +65,18 @@ interface DaLayer {
   // Used by the "verifier" circuit in the zkVM
   function verify_relevant_tx_list(txs: Array<DaTxWithSender>, header: DaHeader, witness: DaMultiProof, completenessproof: CompletenessProof)
 }
+```
+这是一个 DaLayer 的接口定义，具体包括三个函数：
 
+1. `get_relevant_txs(header: DaHeader) -> Array<DaTxWithSender>`：从特定的 DA layer 块获取所有与 Rollup 相关的交易，仅由 Rollup 的完整节点使用。
+
+2. `get_relevant_txs_with_proof(header: DaHeader) -> (Array<DaTxWithSender>, DaMultiProof, CompletenessProof)`：从特定的 DA layer 块获取所有与 Rollup 相关的交易，并附带 Merkle 证明（或类似证明），以显示每个交易确实包含在 DA layer 块中。根据 DA layer 的不同，可能需要包含附加信息以证明未省略任何相关交易。此函数由证明者使用。
+
+3. `verify_relevant_tx_list(txs: Array<DaTxWithSender>, header: DaHeader, witness: DaMultiProof, completenessproof: CompletenessProof)`：验证由不受信任的证明者提供的 Da layer 交易列表既完整又正确。这由 zkVM 中的“验证器”电路使用。
+
+这些函数提供了 DA layer 与 Rollup 之间的交互逻辑。第一个函数用于完整节点获取相关交易，第二个函数用于证明者获取带证明的相关交易，而第三个函数用于验证 zkVM 中的证明。
+
+```rust
 // The interface to a state transition function, inspired by Tendermint's ABCI
 interface StateTransitionFunction {
 	// Called once at rollup Genesis to set up the chain
@@ -80,7 +91,22 @@ interface StateTransitionFunction {
   // Commit changes after processing all rollup messages
   function end_slot(): StateRoot
 }
+```
+这是一个 StateTransitionFunction 的接口定义，其灵感来自于 Tendermint 的 ABCI。以下是每个函数的简要说明：
 
+1. `init_chain(config: Config)`：在 Rollup 的 Genesis 阶段调用，用于设置链的初始状态。
+
+2. `begin_slot(slotnumber: u64)`：表示一个 slot（DA layer 块），可能包含 0 或多个 rollup 块。此函数用于开始处理特定的 slot。
+
+3. `apply_batch(batch: Array<Transaction>, sequencer: Bytes): Array<Array<Event>> | ConsensusSetUpdate`：将一批交易应用于当前的 rollup 状态，返回每个交易的事件列表，或者如果批处理格式错误，则对序列化程序进行惩罚。可能返回事件数组或共识集更新。
+
+4. `apply_proof(proof: RollupProof): Array<ConsensusSetUpdate>`：处理零知识证明，奖励（或惩罚）证明者，并返回可能的共识集更新。
+
+5. `end_slot(): StateRoot`：在处理所有 rollup 消息后提交更改，返回当前 slot 的状态根。
+
+这些函数定义了 StateTransitionFunction 的核心逻辑，包括初始化链，处理 slot，应用交易批次，处理零知识证明，以及提交最终的更改。
+
+```rust
 interface ZkVM {
   // Runs some code, creating a proof of correct execution
   function run(f: Function): Proof
@@ -88,6 +114,14 @@ interface ZkVM {
   function verify(p: Proof): (Result<Array<byte>>)
 }
 ```
+
+这是一个 ZkVM 的接口定义，包含两个主要函数：
+
+1. `run(f: Function): Proof`：运行指定的代码块，生成正确执行的证明。该函数接受一个函数参数 `f`，表示要运行的代码块。它将返回一个证明对象 `Proof`，证明了代码的正确执行。
+
+2. `verify(p: Proof): (Result<Array<byte>>)`: 验证给定的证明 `p`，并在成功时返回其公共输出。该函数接受一个证明对象 `Proof` 作为参数，并返回一个包含字节数组的结果。如果验证成功，结果将包含代码执行的公共输出。
+
+这个接口定义了 ZkVM 的基本操作，其中 ZkVM 用于运行带有零知识证明的代码块，并提供验证函数，以验证这些证明的正确性并获取执行的公共输出。
 
 ### 广义全节点
 
@@ -120,6 +154,36 @@ function run_next_da_block(self, prev_proof: Proof, db: Database) {
   processor.end_slot();
 }
 ```
+
+这段伪代码描述了一个区块链中的区块执行过程，主要涉及到分布式账本（DA，可能代表"Distributed Ledger"）的状态转换。以下是对该伪代码的解释：
+
+1. **初始化阶段**：
+   - 从前一个区块的证明（`prev_proof`）中解析出前一个状态（`prev_state`）。
+   - 使用前一个状态初始化状态转换处理器（`processor`）。
+
+2. **获取下一个区块的头信息**：
+   - 从数据库（`db`）中获取下一个区块的 DA 头信息（`current_da_header`）。
+
+3. **创建状态转换处理器**：
+   - 使用数据库、当前 DA 头信息和前一个状态创建状态转换处理器。
+
+4. **获取 DA 层相关交易**：
+   - 通过调用 `da::get_relevant_txs_with_proof` 获取与当前区块相关的 DA 层交易、包含证明（inclusion proof）和完整性证明（completeness proof）。
+
+5. **验证 DA 层相关交易列表**：
+   - 通过调用 `da::verify_relevant_tx_list` 验证 DA 层交易列表的有效性。
+
+6. **处理 DA 层相关交易**：
+   - 开始新的时间槽（slot），即前一个时间槽编号加一。
+   - 遍历 DA 层的交易列表。
+   - 对于每个 DA 层交易，解析消息（`parse_msg`）。
+   - 如果消息表示一个批处理（`msg.is_batch()`），则调用处理器的 `apply_batch` 方法。
+   - 如果消息表示一个证明（`msg.is_batch() == false`），则调用处理器的 `apply_proof` 方法。
+
+7. **结束时间槽**：
+   - 调用处理器的 `end_slot` 方法，完成当前时间槽的处理。
+
+总体而言，这段代码实现了一个区块在区块链中的执行过程。其中的状态转换处理器负责处理 DA 层交易，根据具体的消息内容进行状态的更新。这个过程包括验证 DA 层的相关交易，解析消息，并根据消息类型选择合适的处理方式。整个过程保证了区块链的状态在每个时间槽内得到正确的更新。
 
 ### 可插拔组件
 

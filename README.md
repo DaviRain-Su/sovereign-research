@@ -1,5 +1,7 @@
 # Sovereign SDK Research
 
+整理的一个简单的[文档](https://arc.net/p/5ADEDB24-187A-4F3F-9771-ED04F081D657)
+
 Sovereign SDK是一个免费且开源的工具包，用于构建Rollups（包括ZK和乐观型），目前正在开发中。Sovereign SDK由三个逻辑组件组成：
 
 1. Rollup接口，一个定义了rollup的最小接口集合

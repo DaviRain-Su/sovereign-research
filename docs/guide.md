@@ -1,5 +1,7 @@
 # Write A Sovereign Module Guide
 
+Add simple-token branch: https://github.com/DaviRain-Su/sovereign/tree/davirain/add-simple-coin-module
+
 1. use Soveregin SDK Module template
 
 - [Module template](https://github.com/DaviRain-Su/sovereign/tree/research/module-system/module-implementations/module-template)
